@@ -1,0 +1,36 @@
+name: Crea i file IPA
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [MaestroCRT, MaestroSNR]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installa XcodeGen
+        run: brew install xcodegen
+      - name: Genera il progetto Xcode
+        run: xcodegen generate
+      - name: Compila senza firma
+        run: |
+          xcodebuild -project Maestro.xcodeproj -target "${{ matrix.app }}" \
+            -sdk iphoneos -configuration Release \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+      - name: Crea il file IPA
+        run: |
+          mkdir Payload
+          cp -R "build/Release-iphoneos/${{ matrix.app }}.app" Payload/
+          zip -qry "${{ matrix.app }}.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}
+          path: ${{ matrix.app }}.ipa
+          if-no-files-found: error
